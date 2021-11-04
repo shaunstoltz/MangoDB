@@ -45,10 +45,17 @@ type Document struct {
 }
 
 func NewDocument(d document) *Document {
-	return &Document{
+	res := &Document{
 		m:    d.Map(),
 		keys: d.Keys(),
 	}
+	if res.m == nil {
+		res.m = map[string]interface{}{}
+	}
+	if res.keys == nil {
+		res.keys = []string{}
+	}
+	return res
 }
 
 func (doc *Document) bsontype() {}
@@ -408,9 +415,10 @@ func unmarshalJSONValue(data []byte) (interface{}, error) {
 			err = o.UnmarshalJSON(data)
 			res = time.Time(o)
 		case v["$r"] != nil:
-			var o Regex
-			err = o.UnmarshalJSON(data)
-			res = types.Regex(o)
+			err = lazyerrors.Errorf("unmarshalJSONValue: unhandled regex %v", v)
+			// var o Regex
+			// err = o.UnmarshalJSON(data)
+			// res = types.Regex(o)
 		case v["$t"] != nil:
 			var o Timestamp
 			err = o.UnmarshalJSON(data)
@@ -419,19 +427,23 @@ func unmarshalJSONValue(data []byte) (interface{}, error) {
 			var o Int64
 			err = o.UnmarshalJSON(data)
 			res = int64(o)
+		default:
+			err = lazyerrors.Errorf("unmarshalJSONValue: unhandled map %v", v)
 		}
+	case string:
+		res = v
 	case []interface{}:
 		var o Array
 		err = o.UnmarshalJSON(data)
 		res = types.Array(o)
 	case bool:
 		res = v
+	case nil:
+		res = v
 	case float64:
 		res = int32(v)
-	case string:
-		res = v
 	default:
-		err = lazyerrors.Errorf("unmarshalJSONValue: unhandled element %[1]T (%[1]v", v)
+		err = lazyerrors.Errorf("unmarshalJSONValue: unhandled element %[1]T (%[1]v)", v)
 	}
 
 	if err != nil {
